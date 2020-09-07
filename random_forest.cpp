@@ -4,8 +4,9 @@
 #include <string>
 #include <vector>
 #include <limits>
-#include <math.h>
+#include <cmath>
 #include <algorithm>
+#include <unordered_set>
 
 void sortrows(std::vector<std::pair<std::vector<float>, int>>& matrix, int col) {    
     std::stable_sort(matrix.begin(),
@@ -140,8 +141,8 @@ std::vector<float> Data::getSample(int row, std::vector<std::vector<float>> &dat
 class DecisionTree {
 public:
     DecisionTree(std::vector<std::pair<std::vector<float>, int>> &data1,
-                std::vector<int> &features,
-                int max_depth1, int depth1);
+                std::vector<int> &features, int num_classes,
+                int max_depth1, int depth1, int min_split);
     std::vector<int> predict(std::vector<std::vector<float>> x);
     int predictSample(std::vector<float> sample);
 
@@ -151,6 +152,7 @@ private:
     int num_of_classes;
     int max_depth;
     int depth;
+    int min_samples_split;
     bool is_leaf;
     int c;
     int split_feature;
@@ -167,13 +169,16 @@ private:
 };
 
 DecisionTree::DecisionTree(std::vector<std::pair<std::vector<float>, int>> &data1,
-                            std::vector<int> &features1,
-                            int max_depth1 = std::numeric_limits<int>::max(), int depth1 = 0) {
+                            std::vector<int> &features1, int num_classes,
+                            int max_depth1 = std::numeric_limits<int>::max(), int depth1 = 0,
+                            int min_split = 2) {
 
     data = data1;
     features = features1;
+    num_of_classes = num_classes;
     max_depth = max_depth1;
     depth = depth1;
+    int min_samples_split = min_samples_split;
     is_leaf = false;
     left = nullptr;
     right = nullptr;
@@ -204,16 +209,16 @@ void DecisionTree::fit() {
         }
     }
 
-    if (data_left.size() < 2 || data_right.size() < 2)
+    if (data_left.size() < min_samples_split || data_right.size() < min_samples_split)
         is_leaf = true;
 
     if (!is_leaf) {
         //std::cout << "Left split size: " << samples_left.size() << std::endl;
         //std::cout << "Right split size: " << samples_right.size() << std::endl;
-        left = new DecisionTree(data_left, features, max_depth, depth + 1);
-        right = new DecisionTree(data_right, features, max_depth, depth + 1);
+        left = new DecisionTree(data_left, features, num_of_classes, max_depth, depth + 1, min_samples_split);
+        right = new DecisionTree(data_right, features, num_of_classes, max_depth, depth + 1, min_samples_split);
     } else {
-        std::vector<int> class_count(3, 0);
+        std::vector<int> class_count(num_of_classes, 0);
 
         for (int sample = 0; sample < data.size(); ++sample) 
             ++class_count[data[sample].second];
@@ -240,9 +245,9 @@ void DecisionTree::findBestSplit(float &best_gini) {
 void DecisionTree::findBestSplitForFeature(int feature, float &feature_split_point, float &feature_best_gini)  {
     std::vector<int> k_tiles;
     sortrows(data, feature);
-    int num_tiles = 20;
+    int num_tiles = 100;
     
-    for (int i = 0; i < num_tiles; ++i) {
+    for (int i = 0; i < std::min(num_tiles, (int) data.size()); ++i) {
         k_tiles.push_back(data.size() * i / num_tiles);
     }
     k_tiles.push_back(data.size() - 1);
@@ -258,8 +263,8 @@ void DecisionTree::findBestSplitForFeature(int feature, float &feature_split_poi
 }
 
 float DecisionTree::giniGain(int feature, float split_val) {
-    std::vector<int> class_count_left(3, 0);
-    std::vector<int> class_count_right(3, 0);
+    std::vector<int> class_count_left(num_of_classes, 0);
+    std::vector<int> class_count_right(num_of_classes, 0);
 
     int count_left = 0, count_right = 0;
     for (int sample = 0; sample < data.size(); ++sample) {
@@ -295,7 +300,7 @@ float DecisionTree::giniGain(int feature, float split_val) {
 }
 
 float DecisionTree::giniImpurity() {
-    std::vector<int> class_count(3, 0);
+    std::vector<int> class_count(num_of_classes, 0);
 
     for (int sample = 0; sample < data.size(); ++sample) 
         ++class_count[data[sample].second];
@@ -344,6 +349,7 @@ private:
     int n_features;
     int max_depth;
     int min_samples_split;
+    int num_of_classes;
     std::vector<DecisionTree*> trees;
     std::vector<int> all_features;
     std::vector<int> all_samples;
@@ -359,6 +365,15 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
     n_trees = num_trees;
     max_depth = depth;
     min_samples_split = min_samples;
+    num_of_classes = 0;
+    std::unordered_set<int> seenClasses;
+
+    for (int sample : y) {
+        if (seenClasses.find(sample) == seenClasses.end()) {
+            ++num_of_classes;
+            seenClasses.insert(sample);
+        }
+    }
 
     for (int i = 0; i < x[0].size(); ++i) 
         all_features.push_back(i);
@@ -369,14 +384,15 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
     if (num_features == "sqrt") {
         n_features = (int) std::sqrt(x[0].size());
     } else if (num_features == "log2") {
-        n_features = 2;
+        n_features = std::log2(x[0].size());
     } else {
-        n_features = 1;
+        n_features = x[0].size() / 4;
     }
     
     for (int i = 0; i < num_trees; ++i) {
         trees.push_back(createTree());
     }
+
 }
 
 DecisionTree* RandomForest::createTree() {
@@ -388,7 +404,7 @@ DecisionTree* RandomForest::createTree() {
     std::vector<int> features(first, last);
     
     std::vector<std::pair<std::vector<float>, int>> data1 = get_copy_with_samples(x, y, all_samples);
-    DecisionTree *tree = new DecisionTree(data1, features, max_depth);
+    DecisionTree *tree = new DecisionTree(data1, features, num_of_classes, max_depth, 0, min_samples_split);
     return tree;
 }
 
@@ -401,7 +417,7 @@ std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
     }
 
     for (int i = 0; i < data.size(); ++i) {
-        std::vector<int> predictions_count(3, 0);
+        std::vector<int> predictions_count(num_of_classes, 0);
         for (int j = 0; j < n_trees; ++j) {
             ++predictions_count[tree_predictions[j][i]];
         }
@@ -430,11 +446,11 @@ int main() {
 
     std::cout << "Loading training data" << std::endl;
     Data data = Data();
-    data.loadTrainSet("data\\train_x.csv", "data\\train_y.csv");
-    data.loadTestSet("data\\test_x.csv", "data\\test_y.csv");
+    data.loadTrainSet("data\\train_x_spam.csv", "data\\train_y_spam.csv");
+    data.loadTestSet("data\\test_x_spam.csv", "data\\test_y_spam.csv");
 
     std::cout << "Number of samples in training data: " <<  data.trainData.size() << std::endl \
-    << "Number of features in training data: " << data.trainData[0].size() << std::endl << std::endl;
+    << "Number of features: " << data.trainData[0].size() << std::endl << std::endl;
 
     std::cout << "Training started" << std::endl << std::endl;
     RandomForest rf = RandomForest(data.trainData, data.trainLabels, 10, "sqrt", 10);
