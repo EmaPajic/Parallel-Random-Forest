@@ -178,7 +178,7 @@ DecisionTree::DecisionTree(std::vector<std::pair<std::vector<float>, int>> &data
     num_of_classes = num_classes;
     max_depth = max_depth1;
     depth = depth1;
-    int min_samples_split = min_samples_split;
+    min_samples_split = min_split;
     is_leaf = false;
     left = nullptr;
     right = nullptr;
