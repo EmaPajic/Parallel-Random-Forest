@@ -384,9 +384,9 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
     if (num_features == "sqrt") {
         n_features = (int) std::sqrt(x[0].size());
     } else if (num_features == "log2") {
-        n_features = std::log2(x[0].size());
+        n_features = (int) std::log2(x[0].size());
     } else {
-        n_features = x[0].size() / 4;
+        n_features = (int) x[0].size() / 4;
     }
     
     for (int i = 0; i < num_trees; ++i) {
