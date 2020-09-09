@@ -65,7 +65,7 @@ void Data::loadData(std::string filename, std::vector<std::vector<float>> &data)
         while(str_stream.good()) {
             std::string temp;
             getline(str_stream, temp, ',');
-            dataRow.push_back(stod(temp));
+            dataRow.push_back(stof(temp));
         }
 
         data.push_back(dataRow);
@@ -89,7 +89,7 @@ void Data::loadLabels(std::string filename, std::vector<int> &labels) {
         while(str_stream.good()) {
             std::string temp;
             getline(str_stream, temp, ',');
-            labels.push_back(stod(temp));
+            labels.push_back(stoi(temp));
         }
     }
 }
@@ -282,8 +282,6 @@ float DecisionTree::giniGain(int feature, float split_val) {
 
     float gini_impurity_left = 0;
     float gini_impurity_right = 0;
-    int num_left = 0;
-    int num_right = 0;
 
     for (int i = 0; i < class_count_left.size(); ++i) {
         float prob_left = (float) class_count_left[i] / count_left;
