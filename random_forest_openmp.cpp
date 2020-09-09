@@ -69,7 +69,7 @@ void Data::loadData(std::string filename, std::vector<std::vector<float>> &data)
         while(str_stream.good()) {
             std::string temp;
             getline(str_stream, temp, ',');
-            dataRow.push_back(stod(temp));
+            dataRow.push_back(stof(temp));
         }
 
         data.push_back(dataRow);
@@ -93,7 +93,7 @@ void Data::loadLabels(std::string filename, std::vector<int> &labels) {
         while(str_stream.good()) {
             std::string temp;
             getline(str_stream, temp, ',');
-            labels.push_back(stod(temp));
+            labels.push_back(stoi(temp));
         }
     }
 }
@@ -395,7 +395,7 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
     
     #pragma omp parallel for default(none)\
     firstprivate(num_trees)\
-    schedule(dynamic)\
+    schedule(static)\
     num_threads(NUM_THREADS)
     for (int i = 0; i < num_trees; ++i) 
     {    
@@ -405,7 +405,7 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
 }
 
 DecisionTree* RandomForest::createTree() {
-    std::cout << "Creating Decision Tree" << std::endl;
+    //std::cout << "Creating Decision Tree" << std::endl;
 
     std::vector<int> all_features;
     for (int i = 0; i < x[0].size(); ++i) 
@@ -448,7 +448,7 @@ std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
     #pragma omp parallel for default(none)\
     firstprivate(num_samples) \
     shared(predictions, tree_predictions) \
-    schedule(dynamic)\
+    schedule(static)\
     num_threads(NUM_THREADS)
     for (int i = 0; i < num_samples; ++i) {
         std::vector<int> predictions_count(num_of_classes, 0);
@@ -489,7 +489,7 @@ int main() {
     std::cout << "Training started" << std::endl << std::endl;
 
     double time_start_parallel = omp_get_wtime();
-    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 100, "sqrt");
+    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 10, "sqrt", 10);
     double time_end_parallel = omp_get_wtime();
 
     std::cout << "Random Forest created" << std::endl;
