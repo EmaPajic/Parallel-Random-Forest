@@ -190,10 +190,10 @@ void DecisionTree::fit() {
     if (depth == max_depth - 1) 
         is_leaf = true;
 
-    float best_gini = 0;
+    float best_gini = -1;
     findBestSplit(best_gini);
 
-    if (best_gini == 0) { 
+    if (best_gini < 0) { 
         is_leaf = true;
     }
 
@@ -245,7 +245,7 @@ void DecisionTree::findBestSplit(float &best_gini) {
 void DecisionTree::findBestSplitForFeature(int feature, float &feature_split_point, float &feature_best_gini)  {
     std::vector<int> k_tiles;
     sortrows(data, feature);
-    int num_tiles = 100;
+    int num_tiles = std::sqrt(data.size());
     
     for (int i = 0; i < std::min(num_tiles, (int) data.size()); ++i) {
         k_tiles.push_back(data.size() * i / num_tiles);
@@ -277,18 +277,15 @@ float DecisionTree::giniGain(int feature, float split_val) {
         }
     }
 
-    if (count_left <= data.size() / 10 || count_right <= data.size() / 10)
-        return 0;
-
-    float gini_impurity_left = 0;
-    float gini_impurity_right = 0;
+    float gini_impurity_left = 1;
+    float gini_impurity_right = 1;
 
     for (int i = 0; i < class_count_left.size(); ++i) {
         float prob_left = (float) class_count_left[i] / count_left;
         float prob_right = (float) class_count_right[i] / count_right;
 
-        gini_impurity_left += prob_left * (1.0 - prob_left);
-        gini_impurity_right += prob_right * (1.0 - prob_right);
+        gini_impurity_left -= prob_left * prob_left;
+        gini_impurity_right -= prob_right * prob_right;
     }
 
     float gini_impurity = (gini_impurity_left * count_left + gini_impurity_right * count_right) / (count_left + count_right);
@@ -303,11 +300,11 @@ float DecisionTree::giniImpurity() {
     for (int sample = 0; sample < data.size(); ++sample) 
         ++class_count[data[sample].second];
 
-    float gini_impurity = 0;
+    float gini_impurity = 1;
 
     for (int count : class_count) {
         float p = (float) count / data.size();
-        gini_impurity += p * (1.0 - p);
+        gini_impurity -= p * p;
     }
     
     return gini_impurity;
@@ -350,7 +347,6 @@ private:
     int num_of_classes;
     std::vector<DecisionTree*> trees;
     std::vector<int> all_features;
-    std::vector<int> all_samples;
 
     DecisionTree* createTree();
 };
@@ -375,9 +371,6 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
 
     for (int i = 0; i < x[0].size(); ++i) 
         all_features.push_back(i);
-    
-    for (int i = 0; i < x.size(); ++i) 
-        all_samples.push_back(i);
 
     if (num_features == "sqrt") {
         n_features = (int) std::sqrt(x[0].size());
@@ -400,8 +393,12 @@ DecisionTree* RandomForest::createTree() {
     std::vector<int>::const_iterator first = all_features.begin();
     std::vector<int>::const_iterator last = all_features.begin() + n_features;
     std::vector<int> features(first, last);
+
+    std::vector<int> samples;
+    for (int i = 0; i < x.size(); ++i) 
+        samples.push_back(std::rand() % x.size());
     
-    std::vector<std::pair<std::vector<float>, int>> data1 = get_copy_with_samples(x, y, all_samples);
+    std::vector<std::pair<std::vector<float>, int>> data1 = get_copy_with_samples(x, y, samples);
     DecisionTree *tree = new DecisionTree(data1, features, num_of_classes, max_depth, 0, min_samples_split);
     return tree;
 }
@@ -451,7 +448,7 @@ int main() {
     << "Number of features: " << data.trainData[0].size() << std::endl << std::endl;
 
     std::cout << "Training started" << std::endl << std::endl;
-    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 10, "sqrt", 10);
+    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 1, "sqrt");
 
     std::cout << "Random Forest created" << std::endl;
 
