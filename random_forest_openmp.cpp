@@ -7,10 +7,7 @@
 #include <cmath>
 #include <algorithm>
 #include <unordered_set>
-#include <ctime>
 #include <omp.h>
-
-#define NUM_THREADS 8
 
 void sortrows(std::vector<std::pair<std::vector<float>, int>>& matrix, int col) {    
     std::stable_sort(matrix.begin(),
@@ -145,7 +142,7 @@ std::vector<float> Data::getSample(int row, std::vector<std::vector<float>> &dat
 class DecisionTree {
 public:
     DecisionTree(std::vector<std::pair<std::vector<float>, int>> &data1,
-                std::vector<int> &features, int num_classes,
+                int num_all_features1, int num_features1, int num_classes,
                 int max_depth1, int depth1, int min_split);
     std::vector<int> predict(std::vector<std::vector<float>> x);
     int predictSample(std::vector<float> sample);
@@ -164,6 +161,8 @@ private:
     float old_gini_impurity;
     DecisionTree *left;
     DecisionTree *right;
+    int num_all_features;
+    int num_features;
 
     void fit();
     void findBestSplit(float &best_gini);
@@ -173,12 +172,15 @@ private:
 };
 
 DecisionTree::DecisionTree(std::vector<std::pair<std::vector<float>, int>> &data1,
-                            std::vector<int> &features1, int num_classes,
+                            int num_all_features1, int num_features1, int num_classes,
                             int max_depth1 = std::numeric_limits<int>::max(), int depth1 = 0,
                             int min_split = 2) {
 
     data = data1;
-    features = features1;
+    num_features = num_features1;
+    num_all_features = num_all_features1;
+    for (int i = 0; i < num_features; ++i)
+        features.push_back(rand() % num_all_features);
     num_of_classes = num_classes;
     max_depth = max_depth1;
     depth = depth1;
@@ -194,10 +196,10 @@ void DecisionTree::fit() {
     if (depth == max_depth - 1) 
         is_leaf = true;
 
-    float best_gini = 0;
+    float best_gini = -1;
     findBestSplit(best_gini);
 
-    if (best_gini == 0) { 
+    if (best_gini < 0) { 
         is_leaf = true;
     }
 
@@ -219,8 +221,8 @@ void DecisionTree::fit() {
     if (!is_leaf) {
         //std::cout << "Left split size: " << samples_left.size() << std::endl;
         //std::cout << "Right split size: " << samples_right.size() << std::endl;
-        left = new DecisionTree(data_left, features, num_of_classes, max_depth, depth + 1, min_samples_split);
-        right = new DecisionTree(data_right, features, num_of_classes, max_depth, depth + 1, min_samples_split);
+        left = new DecisionTree(data_left, num_all_features, num_features, num_of_classes, max_depth, depth + 1, min_samples_split);
+        right = new DecisionTree(data_right, num_all_features, num_features, num_of_classes, max_depth, depth + 1, min_samples_split);
     } else {
         std::vector<int> class_count(num_of_classes, 0);
 
@@ -249,7 +251,7 @@ void DecisionTree::findBestSplit(float &best_gini) {
 void DecisionTree::findBestSplitForFeature(int feature, float &feature_split_point, float &feature_best_gini)  {
     std::vector<int> k_tiles;
     sortrows(data, feature);
-    int num_tiles = (int) std::sqrt(data.size());
+    int num_tiles = std::sqrt(data.size());
     
     for (int i = 0; i < std::min(num_tiles, (int) data.size()); ++i) {
         k_tiles.push_back(data.size() * i / num_tiles);
@@ -281,20 +283,15 @@ float DecisionTree::giniGain(int feature, float split_val) {
         }
     }
 
-    if (count_left <= data.size() / 10 || count_right <= data.size() / 10)
-        return 0;
-
-    float gini_impurity_left = 0;
-    float gini_impurity_right = 0;
-    int num_left = 0;
-    int num_right = 0;
+    float gini_impurity_left = 1;
+    float gini_impurity_right = 1;
 
     for (int i = 0; i < class_count_left.size(); ++i) {
         float prob_left = (float) class_count_left[i] / count_left;
         float prob_right = (float) class_count_right[i] / count_right;
 
-        gini_impurity_left += prob_left * (1.0 - prob_left);
-        gini_impurity_right += prob_right * (1.0 - prob_right);
+        gini_impurity_left -= prob_left * prob_left;
+        gini_impurity_right -= prob_right * prob_right;
     }
 
     float gini_impurity = (gini_impurity_left * count_left + gini_impurity_right * count_right) / (count_left + count_right);
@@ -309,11 +306,11 @@ float DecisionTree::giniImpurity() {
     for (int sample = 0; sample < data.size(); ++sample) 
         ++class_count[data[sample].second];
 
-    float gini_impurity = 0;
+    float gini_impurity = 1;
 
     for (int count : class_count) {
         float p = (float) count / data.size();
-        gini_impurity += p * (1.0 - p);
+        gini_impurity -= p * p;
     }
     
     return gini_impurity;
@@ -355,7 +352,6 @@ private:
     int min_samples_split;
     int num_of_classes;
     std::vector<DecisionTree*> trees;
-    std::vector<int> all_samples;
 
     DecisionTree* createTree();
 };
@@ -377,14 +373,11 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
             seenClasses.insert(sample);
         }
     }
-    
-    for (int i = 0; i < x.size(); ++i) 
-        all_samples.push_back(i);
 
     if (num_features == "sqrt") {
         n_features = (int) std::sqrt(x[0].size());
     } else if (num_features == "log2") {
-        n_features = (int) std::log2(x[0].size());
+        n_features = 3 * (int) std::log2(x[0].size() + 1);
     } else {
         n_features = (int) x[0].size() / 4;
     }
@@ -401,23 +394,17 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
     {    
         trees[i] = createTree();
     }
-
 }
 
 DecisionTree* RandomForest::createTree() {
-    //std::cout << "Creating Decision Tree" << std::endl;
+    std::cout << "Creating Decision Tree" << std::endl;
 
-    std::vector<int> all_features;
-    for (int i = 0; i < x[0].size(); ++i) 
-        all_features.push_back(i);
-
-    std::random_shuffle(all_features.begin(), all_features.end());
-    std::vector<int>::const_iterator first = all_features.begin();
-    std::vector<int>::const_iterator last = all_features.begin() + n_features;
-    std::vector<int> features(first, last);
+    std::vector<int> samples;
+    for (int i = 0; i < x.size(); ++i) 
+        samples.push_back(std::rand() % x.size());
     
-    std::vector<std::pair<std::vector<float>, int>> data1 = get_copy_with_samples(x, y, all_samples);
-    DecisionTree *tree = new DecisionTree(data1, features, num_of_classes, max_depth, 0, min_samples_split);
+    std::vector<std::pair<std::vector<float>, int>> data1 = get_copy_with_samples(x, y, samples);
+    DecisionTree *tree = new DecisionTree(data1, x[0].size(), n_features, num_of_classes, max_depth, 0, min_samples_split);
     return tree;
 }
 
@@ -460,7 +447,7 @@ std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
                                      predictions_count.end()));
         predictions[i] = pred;
     }
-
+    
     return predictions;
 }
 
@@ -480,26 +467,19 @@ int main() {
 
     std::cout << "Loading training data" << std::endl;
     Data data = Data();
-    data.loadTrainSet("data/train_x_spam.csv", "data/train_y_spam.csv");
-    data.loadTestSet("data/test_x_spam.csv", "data/test_y_spam.csv");
+    data.loadTrainSet("data\\train_x_spam.csv", "data\\train_y_spam.csv");
+    data.loadTestSet("data\\test_x_spam.csv", "data\\test_y_spam.csv");
 
     std::cout << "Number of samples in training data: " <<  data.trainData.size() << std::endl \
     << "Number of features: " << data.trainData[0].size() << std::endl << std::endl;
 
     std::cout << "Training started" << std::endl << std::endl;
-
-    double time_start_parallel = omp_get_wtime();
-    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 10, "sqrt", 10);
-    double time_end_parallel = omp_get_wtime();
+    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 10, "sqrt");
 
     std::cout << "Random Forest created" << std::endl;
-    std::cout << "Elapsed time: " << time_end_parallel - time_start_parallel << std::endl << std::endl;
 
-    double time_start_parallel_pred = omp_get_wtime();
     std::vector<int> predictions = rf.predict(data.testData);
-    double time_end_parallel_pred = omp_get_wtime();
 
     std::cout << "Accuracy: " << accuracy(predictions, data.testLabels) << std::endl;
-    std::cout << "Elapsed time: " << time_end_parallel_pred - time_start_parallel_pred << std::endl << std::endl;
     return 0;
 }
