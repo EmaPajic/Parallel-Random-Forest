@@ -141,7 +141,7 @@ std::vector<float> Data::getSample(int row, std::vector<std::vector<float>> &dat
 class DecisionTree {
 public:
     DecisionTree(std::vector<std::pair<std::vector<float>, int>> &data1,
-                std::vector<int> &features, int num_classes,
+                int num_all_features1, int num_features1, int num_classes,
                 int max_depth1, int depth1, int min_split);
     std::vector<int> predict(std::vector<std::vector<float>> x);
     int predictSample(std::vector<float> sample);
@@ -160,6 +160,8 @@ private:
     float old_gini_impurity;
     DecisionTree *left;
     DecisionTree *right;
+    int num_all_features;
+    int num_features;
 
     void fit();
     void findBestSplit(float &best_gini);
@@ -169,12 +171,15 @@ private:
 };
 
 DecisionTree::DecisionTree(std::vector<std::pair<std::vector<float>, int>> &data1,
-                            std::vector<int> &features1, int num_classes,
+                            int num_all_features1, int num_features1, int num_classes,
                             int max_depth1 = std::numeric_limits<int>::max(), int depth1 = 0,
                             int min_split = 2) {
 
     data = data1;
-    features = features1;
+    num_features = num_features1;
+    num_all_features = num_all_features1;
+    for (int i = 0; i < num_features; ++i)
+        features.push_back(rand() % num_all_features);
     num_of_classes = num_classes;
     max_depth = max_depth1;
     depth = depth1;
@@ -215,8 +220,8 @@ void DecisionTree::fit() {
     if (!is_leaf) {
         //std::cout << "Left split size: " << samples_left.size() << std::endl;
         //std::cout << "Right split size: " << samples_right.size() << std::endl;
-        left = new DecisionTree(data_left, features, num_of_classes, max_depth, depth + 1, min_samples_split);
-        right = new DecisionTree(data_right, features, num_of_classes, max_depth, depth + 1, min_samples_split);
+        left = new DecisionTree(data_left, num_all_features, num_features, num_of_classes, max_depth, depth + 1, min_samples_split);
+        right = new DecisionTree(data_right, num_all_features, num_features, num_of_classes, max_depth, depth + 1, min_samples_split);
     } else {
         std::vector<int> class_count(num_of_classes, 0);
 
@@ -346,7 +351,6 @@ private:
     int min_samples_split;
     int num_of_classes;
     std::vector<DecisionTree*> trees;
-    std::vector<int> all_features;
 
     DecisionTree* createTree();
 };
@@ -369,13 +373,10 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
         }
     }
 
-    for (int i = 0; i < x[0].size(); ++i) 
-        all_features.push_back(i);
-
     if (num_features == "sqrt") {
         n_features = (int) std::sqrt(x[0].size());
     } else if (num_features == "log2") {
-        n_features = (int) std::log2(x[0].size());
+        n_features = 3 * (int) std::log2(x[0].size() + 1);
     } else {
         n_features = (int) x[0].size() / 4;
     }
@@ -389,17 +390,12 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
 DecisionTree* RandomForest::createTree() {
     std::cout << "Creating Decision Tree" << std::endl;
 
-    std::random_shuffle(all_features.begin(), all_features.end());
-    std::vector<int>::const_iterator first = all_features.begin();
-    std::vector<int>::const_iterator last = all_features.begin() + n_features;
-    std::vector<int> features(first, last);
-
     std::vector<int> samples;
     for (int i = 0; i < x.size(); ++i) 
         samples.push_back(std::rand() % x.size());
     
     std::vector<std::pair<std::vector<float>, int>> data1 = get_copy_with_samples(x, y, samples);
-    DecisionTree *tree = new DecisionTree(data1, features, num_of_classes, max_depth, 0, min_samples_split);
+    DecisionTree *tree = new DecisionTree(data1, x[0].size(), n_features, num_of_classes, max_depth, 0, min_samples_split);
     return tree;
 }
 
@@ -448,7 +444,7 @@ int main() {
     << "Number of features: " << data.trainData[0].size() << std::endl << std::endl;
 
     std::cout << "Training started" << std::endl << std::endl;
-    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 1, "sqrt");
+    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 10, "sqrt");
 
     std::cout << "Random Forest created" << std::endl;
 
