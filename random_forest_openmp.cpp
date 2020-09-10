@@ -399,7 +399,7 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
 }
 
 DecisionTree* RandomForest::createTree() {
-    std::cout << "Creating Decision Tree" << std::endl;
+    //std::cout << "Creating Decision Tree" << std::endl;
 
     std::vector<int> samples;
     for (int i = 0; i < x.size(); ++i) 
@@ -465,23 +465,30 @@ float accuracy(std::vector<int> predicted, std::vector<int> labels) {
 }
 
 int main() {
-    std::cout << "Execution started" << std::endl << std::endl;
+std::cout << "Execution started" << std::endl << std::endl;
 
     std::cout << "Loading training data" << std::endl;
     Data data = Data();
-    data.loadTrainSet("data\\train_x_spam.csv", "data\\train_y_spam.csv");
-    data.loadTestSet("data\\test_x_spam.csv", "data\\test_y_spam.csv");
+    data.loadTrainSet("data/train_x_spam.csv", "data/train_y_spam.csv");
+    data.loadTestSet("data/test_x_spam.csv", "data/test_y_spam.csv");
 
     std::cout << "Number of samples in training data: " <<  data.trainData.size() << std::endl \
     << "Number of features: " << data.trainData[0].size() << std::endl << std::endl;
 
     std::cout << "Training started" << std::endl << std::endl;
-    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 10, "sqrt");
+
+    double time_start_parallel = omp_get_wtime();
+    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 100, "sqrt");
+    double time_end_parallel = omp_get_wtime();
 
     std::cout << "Random Forest created" << std::endl;
+    std::cout << "Elapsed time: " << time_end_parallel - time_start_parallel << std::endl << std::endl;
 
+    double time_start_parallel_pred = omp_get_wtime();
     std::vector<int> predictions = rf.predict(data.testData);
+    double time_end_parallel_pred = omp_get_wtime();
 
     std::cout << "Accuracy: " << accuracy(predictions, data.testLabels) << std::endl;
+    std::cout << "Elapsed time: " << time_end_parallel_pred - time_start_parallel_pred << std::endl << std::endl;
     return 0;
 }
