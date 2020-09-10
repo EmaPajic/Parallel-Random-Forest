@@ -9,6 +9,8 @@
 #include <unordered_set>
 #include <omp.h>
 
+#define NUM_THREADS 8
+
 void sortrows(std::vector<std::pair<std::vector<float>, int>>& matrix, int col) {    
     std::stable_sort(matrix.begin(),
               matrix.end(),
@@ -447,7 +449,7 @@ std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
                                      predictions_count.end()));
         predictions[i] = pred;
     }
-    
+
     return predictions;
 }
 
