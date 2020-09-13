@@ -144,7 +144,6 @@ public:
                 int num_all_features1, int num_features1, int num_classes,
                 int max_depth1, int depth1, int min_split);
     std::vector<int> predict(std::vector<std::vector<float>> x);
-    int predictSample(std::vector<float> sample);
 
 private:
     std::vector<std::pair<std::vector<float>, int>> data;
@@ -168,6 +167,7 @@ private:
     void findBestSplitForFeature(int feature, float &feature_split_point, float &feature_best_gini);
     float giniGain(int feature, float split_val);
     float giniImpurity();
+    int predictSample(std::vector<float> sample);
 };
 
 DecisionTree::DecisionTree(std::vector<std::pair<std::vector<float>, int>> &data1,
