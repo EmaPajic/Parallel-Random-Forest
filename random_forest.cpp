@@ -378,17 +378,16 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
     } else if (num_features == "log2") {
         n_features = 3 * (int) std::log2(x[0].size() + 1);
     } else {
-        n_features = (int) x[0].size() / 4;
+        n_features = (int) x[0].size();
     }
     
-    for (int i = 0; i < num_trees; ++i) {
+    for (int i = 0; i < num_trees; ++i) {    
         trees.push_back(createTree());
     }
-
 }
 
 DecisionTree* RandomForest::createTree() {
-    std::cout << "Creating Decision Tree" << std::endl;
+    //std::cout << "Creating Decision Tree" << std::endl;
 
     std::vector<int> samples;
     for (int i = 0; i < x.size(); ++i) 
@@ -400,14 +399,16 @@ DecisionTree* RandomForest::createTree() {
 }
 
 std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
-    std::vector<int> predictions;
+    std::vector<int> predictions(data.size(), 0);
     std::vector<std::vector<int>> tree_predictions;
 
-    for (DecisionTree* tree : trees) {
-        tree_predictions.push_back(tree->predict(data));
+    for (int i = 0; i < n_trees; ++i) {
+        tree_predictions.push_back(trees[i]->predict(data));
     }
 
-    for (int i = 0; i < data.size(); ++i) {
+    int num_samples = data.size();
+
+    for (int i = 0; i < num_samples; ++i) {
         std::vector<int> predictions_count(num_of_classes, 0);
         for (int j = 0; j < n_trees; ++j) {
             ++predictions_count[tree_predictions[j][i]];
@@ -415,7 +416,7 @@ std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
         int pred = std::distance(predictions_count.begin(), 
                     std::max_element(predictions_count.begin(),
                                      predictions_count.end()));
-        predictions.push_back(pred);
+        predictions[i] = pred;
     }
 
     return predictions;
