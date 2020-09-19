@@ -384,17 +384,13 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
         n_features = (int) x[0].size() / 4;
     }
     
-    for (int i = 0; i < num_trees; ++i) {
-        trees.push_back(nullptr);
-    }
-    
     #pragma omp parallel for default(none)\
     firstprivate(num_trees)\
-    schedule(static)\
+    schedule(dynamic)\
     num_threads(NUM_THREADS)
     for (int i = 0; i < num_trees; ++i) 
     {    
-        trees[i] = createTree();
+        trees.push_back(createTree());
     }
 }
 
@@ -411,13 +407,8 @@ DecisionTree* RandomForest::createTree() {
 }
 
 std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
-    std::vector<int> predictions;
+    std::vector<int> predictions(data.size(), 0);
     std::vector<std::vector<int>> tree_predictions;
-
-    for (int i = 0; i < n_trees; ++i) {
-        std::vector<int> temp;
-        tree_predictions.push_back(temp);
-    }
 
     #pragma omp parallel for default(none)\
     shared(data, tree_predictions) \
@@ -425,14 +416,10 @@ std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
     num_threads(NUM_THREADS)
     for (int i = 0; i < n_trees; ++i) 
     {
-        tree_predictions[i] = trees[i]->predict(data);
+        tree_predictions.push_back(trees[i]->predict(data));
     }
 
     int num_samples = data.size();
-
-    for (int i = 0; i < num_samples; ++i) {
-        predictions.push_back(0);
-    }
 
     #pragma omp parallel for default(none)\
     firstprivate(num_samples) \
@@ -478,7 +465,7 @@ std::cout << "Execution started" << std::endl << std::endl;
     std::cout << "Training started" << std::endl << std::endl;
 
     double time_start_parallel = omp_get_wtime();
-    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 100, "sqrt");
+    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 1, "sqrt");
     double time_end_parallel = omp_get_wtime();
 
     std::cout << "Random Forest created" << std::endl;
