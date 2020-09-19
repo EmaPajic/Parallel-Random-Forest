@@ -381,16 +381,20 @@ RandomForest::RandomForest(std::vector<std::vector<float>> &data, std::vector<in
     } else if (num_features == "log2") {
         n_features = 3 * (int) std::log2(x[0].size() + 1);
     } else {
-        n_features = (int) x[0].size() / 4;
+        n_features = (int) x[0].size();
     }
     
+    for (int i = 0; i < num_trees; ++i) {
+        trees.push_back(nullptr);
+    }
+
     #pragma omp parallel for default(none)\
     firstprivate(num_trees)\
     schedule(dynamic)\
     num_threads(NUM_THREADS)
     for (int i = 0; i < num_trees; ++i) 
     {    
-        trees.push_back(createTree());
+        trees[i] = createTree();
     }
 }
 
@@ -407,8 +411,13 @@ DecisionTree* RandomForest::createTree() {
 }
 
 std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
-    std::vector<int> predictions(data.size(), 0);
+    std::vector<int> predictions;
     std::vector<std::vector<int>> tree_predictions;
+
+    for (int i = 0; i < n_trees; ++i) {
+        std::vector<int> temp;
+        tree_predictions.push_back(temp);
+    }
 
     #pragma omp parallel for default(none)\
     shared(data, tree_predictions) \
@@ -416,17 +425,22 @@ std::vector<int> RandomForest::predict(std::vector<std::vector<float>> data) {
     num_threads(NUM_THREADS)
     for (int i = 0; i < n_trees; ++i) 
     {
-        tree_predictions.push_back(trees[i]->predict(data));
+        tree_predictions[i] = trees[i]->predict(data);
     }
 
     int num_samples = data.size();
+
+    for (int i = 0; i < num_samples; ++i) {
+        predictions.push_back(0);
+    }
 
     #pragma omp parallel for default(none)\
     firstprivate(num_samples) \
     shared(predictions, tree_predictions) \
     schedule(static)\
     num_threads(NUM_THREADS)
-    for (int i = 0; i < num_samples; ++i) {
+    for (int i = 0; i < num_samples; ++i) 
+    {
         std::vector<int> predictions_count(num_of_classes, 0);
         for (int j = 0; j < n_trees; ++j) {
             ++predictions_count[tree_predictions[j][i]];
@@ -456,8 +470,8 @@ std::cout << "Execution started" << std::endl << std::endl;
 
     std::cout << "Loading training data" << std::endl;
     Data data = Data();
-    data.loadTrainSet("data/train_x_spam.csv", "data/train_y_spam.csv");
-    data.loadTestSet("data/test_x_spam.csv", "data/test_y_spam.csv");
+    data.loadTrainSet("data/train_x_iris.csv", "data/train_y_iris.csv");
+    data.loadTestSet("data/test_x_iris.csv", "data/test_y_iris.csv");
 
     std::cout << "Number of samples in training data: " <<  data.trainData.size() << std::endl \
     << "Number of features: " << data.trainData[0].size() << std::endl << std::endl;
@@ -465,7 +479,7 @@ std::cout << "Execution started" << std::endl << std::endl;
     std::cout << "Training started" << std::endl << std::endl;
 
     double time_start_parallel = omp_get_wtime();
-    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 1, "sqrt");
+    RandomForest rf = RandomForest(data.trainData, data.trainLabels, 10, "sqrt");
     double time_end_parallel = omp_get_wtime();
 
     std::cout << "Random Forest created" << std::endl;
